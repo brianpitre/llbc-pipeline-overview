@@ -1,0 +1,326 @@
+<meta charset="utf-8">
+<title>LLBC Translation Pipeline</title>
+<style>
+  :root {
+    --ground: #FAFBFA;
+    --surface: #F1F4F2;
+    --line: #DCE3E0;
+    --ink: #1C2422;
+    --muted: #5C6763;
+    --accent: #0E5A5E;
+    --accent-soft: #E3EEED;
+    --gate: #A97B14;
+    --gate-soft: #F6EED9;
+    --paid: #A4383A;
+    --paid-soft: #F6E4E4;
+    --done: #2E7D4F;
+    --done-soft: #E2EFE7;
+    --display: "Avenir Next", "Segoe UI", -apple-system, sans-serif;
+    --body: "Charter", "Georgia", "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #141A18; --surface: #1C2421; --line: #2C3733;
+      --ink: #E7ECEA; --muted: #93A09B;
+      --accent: #6FC4C8; --accent-soft: #16302F;
+      --gate: #DCA83E; --gate-soft: #2E2716;
+      --paid: #D97F81; --paid-soft: #331D1E;
+      --done: #74BE93; --done-soft: #1A2C22;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #FAFBFA; --surface: #F1F4F2; --line: #DCE3E0;
+    --ink: #1C2422; --muted: #5C6763;
+    --accent: #0E5A5E; --accent-soft: #E3EEED;
+    --gate: #A97B14; --gate-soft: #F6EED9;
+    --paid: #A4383A; --paid-soft: #F6E4E4;
+    --done: #2E7D4F; --done-soft: #E2EFE7;
+  }
+  :root[data-theme="dark"] {
+    --ground: #141A18; --surface: #1C2421; --line: #2C3733;
+    --ink: #E7ECEA; --muted: #93A09B;
+    --accent: #6FC4C8; --accent-soft: #16302F;
+    --gate: #DCA83E; --gate-soft: #2E2716;
+    --paid: #D97F81; --paid-soft: #331D1E;
+    --done: #74BE93; --done-soft: #1A2C22;
+  }
+
+  body { background: var(--ground); color: var(--ink); font-family: var(--body);
+         line-height: 1.55; margin: 0; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  .eyebrow { font-family: var(--display); font-size: 12px; font-weight: 600;
+             letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 30px;
+       letter-spacing: -0.01em; margin: 6px 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 16.5px; max-width: 60ch; margin: 0 0 8px; }
+  .stamp { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  h2 { font-family: var(--display); font-weight: 700; font-size: 19px;
+       margin: 52px 0 4px; letter-spacing: -0.005em; }
+  .subnote { color: var(--muted); font-size: 14.5px; margin: 0 0 22px; }
+
+  /* -- pipeline spine ------------------------------- */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .stage { display: grid; grid-template-columns: 44px 1fr; gap: 0 16px;
+           position: relative; padding: 14px 0; }
+  .stage::before { content: ""; position: absolute; left: 21px; top: 0; bottom: 0;
+                   width: 2px; background: var(--line); }
+  .stage:first-child::before { top: 14px; }
+  .num { font-family: var(--mono); font-size: 13px; font-weight: 600;
+         width: 44px; height: 44px; border-radius: 50%;
+         background: var(--surface); border: 2px solid var(--line);
+         color: var(--accent); display: flex; align-items: center; justify-content: center;
+         position: relative; z-index: 1; }
+  .stage.is-paid .num { border-color: var(--paid); color: var(--paid); }
+  .s-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .s-name { font-family: var(--display); font-weight: 600; font-size: 16.5px; }
+  .chip { font-family: var(--display); font-size: 11px; font-weight: 600;
+          letter-spacing: 0.06em; text-transform: uppercase;
+          padding: 2px 9px; border-radius: 100px; white-space: nowrap; }
+  .chip.paid { background: var(--paid-soft); color: var(--paid); }
+  .chip.auto { background: var(--accent-soft); color: var(--accent); }
+  .s-desc { color: var(--muted); font-size: 15px; margin: 3px 0 0; max-width: 62ch; }
+  .s-gate { display: flex; gap: 8px; align-items: baseline; margin-top: 8px;
+            font-family: var(--display); font-size: 13.5px; color: var(--gate); }
+  .s-gate b { font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+  .s-gate .tick { font-family: var(--mono); }
+  .s-gate span.what { color: var(--muted); font-family: var(--body); font-size: 14px; }
+
+  .pause { position: relative; margin: 10px 0; padding: 14px 18px 14px 60px;
+           background: var(--gate-soft); border: 1.5px solid var(--gate);
+           border-radius: 10px; }
+  .pause::before { content: "\23F8"; position: absolute; left: 20px; top: 50%;
+                   transform: translateY(-50%); font-size: 20px; color: var(--gate); }
+  .pause .p-name { font-family: var(--display); font-weight: 700; font-size: 15px;
+                   color: var(--gate); letter-spacing: 0.02em; }
+  .pause p { margin: 3px 0 0; font-size: 14.5px; color: var(--ink); max-width: 62ch; }
+
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--surface);
+         padding: 1px 5px; border-radius: 4px; }
+
+  /* -- checklist ------------------------------------ */
+  .group { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 18px;
+           overflow: hidden; }
+  .g-head { display: flex; justify-content: space-between; align-items: baseline;
+            padding: 12px 18px; background: var(--surface);
+            font-family: var(--display); }
+  .g-title { font-weight: 700; font-size: 14.5px; }
+  .g-count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .group.done .g-title { color: var(--done); }
+  ul.checks { list-style: none; margin: 0; padding: 6px 8px; display: flex;
+              flex-direction: column; }
+  ul.checks li { border-top: 1px solid var(--line); }
+  ul.checks li:first-child { border-top: none; }
+  ul.checks label { display: grid; grid-template-columns: 20px 1fr; gap: 12px;
+                    padding: 10px 10px; cursor: pointer; align-items: start;
+                    border-radius: 8px; }
+  ul.checks label:hover { background: var(--surface); }
+  ul.checks input { width: 17px; height: 17px; margin-top: 3px; accent-color: var(--accent); }
+  .group.done ul.checks input { accent-color: var(--done); }
+  .group.done ul.checks label { cursor: default; }
+  .t { font-size: 15px; }
+  .t small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 1px; }
+  input:checked + .t { color: var(--muted); }
+  .group.done input:checked + .t { color: inherit; }
+
+  .foot { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line);
+          color: var(--muted); font-size: 13.5px; }
+  .foot code { font-size: 0.9em; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Life Leadership Bible College &#183; Spanish + Italian</div>
+    <h1>Course Video Translation Pipeline</h1>
+    <p class="lede">Every lesson travels this road from English master to translated
+    export &#8212; the teacher's own voice, lips re-synced on the real footage, subtitles
+    included. Machines do the work; humans hold the two gates that matter.</p>
+    <div class="stamp">System verified end-to-end &#183; July 10, 2026</div>
+  </header>
+
+  <h2>The road: master in, export out</h2>
+  <p class="subnote">Amber = a check or a human gate. Nothing final gets rendered until a person has approved it.</p>
+
+  <div class="flow">
+    <div class="stage">
+      <div class="num">1</div>
+      <div>
+        <div class="s-head"><span class="s-name">Ingest</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">A row in the catalog becomes one job per language. The video is
+        probed and, if needed, converted to a clean high-bitrate working copy.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">2</div>
+      <div>
+        <div class="s-head"><span class="s-name">Transcribe</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">Two independent speech engines transcribe the same lesson,
+        so neither grades its own homework.</p>
+        <div class="s-gate"><span class="tick">&#10003;</span><b>Gate 1</b>
+          <span class="what">the two transcripts are compared; disagreements (names, numbers, scripture references) get resolved before anything else happens.</span></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">3</div>
+      <div>
+        <div class="s-head"><span class="s-name">Translate</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">A pinned AI model translates with the course glossary and
+        style guide, quotes scripture from the published version
+        (RVR1960&nbsp;&#183;&nbsp;NR2006), and writes to fit the clock. New ambiguous terms
+        are flagged for a human to decide &#8212; decisions grow the glossary permanently.</p>
+        <div class="s-gate"><span class="tick">&#10003;</span><b>Gate 2</b>
+          <span class="what">a different vendor's model blind-checks every line for lost or changed meaning.</span></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">4</div>
+      <div>
+        <div class="s-head"><span class="s-name">Re-voice</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">The teacher's cloned voice speaks the translation, chunk by
+        chunk, with timing auto-fitted to the original delivery.</p>
+        <div class="s-gate"><span class="tick">&#10003;</span><b>Gate 3</b>
+          <span class="what">the generated audio is transcribed back and compared &#8212; garbled spots get re-voiced.</span></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">5</div>
+      <div>
+        <div class="s-head"><span class="s-name">Master</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">Every track is normalized to the same broadcast loudness
+        (&#8722;16&nbsp;LUFS, &#8722;1&nbsp;dB true peak) so a whole course sits at one volume.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">6</div>
+      <div>
+        <div class="s-head"><span class="s-name">Package for review</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">A watchable preview (translated audio over the original
+        picture), a click-to-play review page, and draft subtitles land in Dropbox.</p>
+      </div>
+    </div>
+
+    <div class="pause">
+      <div class="p-name">TEAM REVIEW &#8212; Audio QC</div>
+      <p>A native reviewer opens the review page from Dropbox, listens, and approves &#8212;
+      or flags lines with corrections. Corrections are applied automatically, only the
+      affected chunks are re-voiced, and the lesson comes back for re-review. Nothing
+      moves past this gate on its own.</p>
+    </div>
+
+    <div class="stage is-paid">
+      <div class="num">7</div>
+      <div>
+        <div class="s-head"><span class="s-name">Lip-sync</span><span class="chip paid">after approval only</span></div>
+        <p class="s-desc">One continuous pass re-syncs the teacher's lips on the real
+        footage (top quality tier, locked). Never runs until the audio has been
+        approved at the gate above.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="num">8</div>
+      <div>
+        <div class="s-head"><span class="s-name">Finish</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">Spec checks (length lock, color tags, loudness re-verified)
+        and final subtitles generated.</p>
+      </div>
+    </div>
+
+    <div class="pause">
+      <div class="p-name">TEAM REVIEW &#8212; Final QC</div>
+      <p>Team watches the export and gives the final word.</p>
+    </div>
+
+    <div class="stage">
+      <div class="num">9</div>
+      <div>
+        <div class="s-head"><span class="s-name">Deliver</span><span class="chip auto">automatic</span></div>
+        <p class="s-desc">The finished <code>.mp4</code> + <code>.srt</code> land in the
+        course's Dropbox delivery folder, named and sorted:
+        <code>deliver/&lt;course&gt;/&lt;video&gt;__&lt;lang&gt;</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>Checklist</h2>
+  <p class="subnote">Boxes you tick are remembered on this device.</p>
+
+  <div class="group done">
+    <div class="g-head"><span class="g-title">Done &#8212; built &amp; verified</span><span class="g-count">5 / 5</span></div>
+    <ul class="checks">
+      <li><label><input type="checkbox" checked disabled><span class="t">Pipeline built and verified end-to-end<small>Full dry-run: ingest &#8594; delivery, both human gates enforced, no live services touched</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Reviewer round-trip working<small>Review page &#8594; decisions file &#8594; corrections applied &#8594; only affected chunks redone</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">All 40 courses cataloged; ES + IT glossaries seeded<small>Course titles pre-translated as provisional &#8212; native reviewers confirm</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Every run logged; batch safeguards in place<small>Nothing runs twice, nothing advances a gate on its own</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Setup guide written, including the dedicated-iMac deployment</span></label></li>
+    </ul>
+  </div>
+
+  <div class="group" id="team">
+    <div class="g-head"><span class="g-title">To do &#8212; Brian &amp; team</span><span class="g-count" data-count></span></div>
+    <ul class="checks">
+      <li><label><input type="checkbox"><span class="t">Provision the iMac<small>User <code>aitranslator</code> &#183; never-sleep &#183; auto-login &#183; TeamViewer with named accounts + 2FA (see SETUP.md)</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Create the three Dropbox folders and point the config at them<small>QC packages &#183; Delivered &#183; Decisions Inbox</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">OpenRouter API key into <code>.env</code><small>Secure handoff &#8212; never chat or email</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Fill the real manifest<small>One row per video: id, course, module, title, speaker, source path</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Speaker roster: ElevenLabs clone + recorded consent per teacher</span></label></li>
+      <li><label><input type="checkbox"><span class="t">Point the system at the source masters<small>Where they live, what format</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Confirm ElevenLabs account capacity for batch volume</span></label></li>
+      <li><label><input type="checkbox"><span class="t">Brief the native reviewers on the Dropbox review flow</span></label></li>
+    </ul>
+  </div>
+
+  <div class="group" id="pilot">
+    <div class="g-head"><span class="g-title">Pilot &#8212; first test flights</span><span class="g-count" data-count></span></div>
+    <ul class="checks">
+      <li><label><input type="checkbox"><span class="t">Health check passes live<small><code>doctor.py --live</code>: keys, model slugs, voices all verified</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Voice certification per speaker &#215; language<small>One-minute proof before any full lesson is processed</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Pilot 1&#8211;2 full lessons in both languages, whole chain</span></label></li>
+      <li><label><input type="checkbox"><span class="t">Validate the 24-minute single-pass lip-sync<small>The last real technical unknown; fallback documented if it caps</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Native reviewers confirm the language decisions<small>Formality (t&#250;/usted &#183; tu/voi) &#183; course-title language &#183; provisional glossary terms</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Time a full lesson end to end<small>Machine hours + review minutes, so we can schedule the full catalog</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Leadership green-light to scale beyond the pilot</span></label></li>
+      <li><label><input type="checkbox"><span class="t">Scale in waves, course by course</span></label></li>
+    </ul>
+  </div>
+
+  <div class="foot">
+    This page lives in the repo at <code>docs/pipeline-overview.html</code> &#183; Full
+    operating detail: <code>CLAUDE.md</code> (how it runs) &#183; <code>docs/CONTRACTS.md</code>
+    (how it's built) &#183; <code>SETUP.md</code> (how to stand it up).
+  </div>
+</div>
+
+<script>
+  (function () {
+    var KEY = "llbc-checklist-v1";
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+    var boxes = document.querySelectorAll('.group:not(.done) input[type="checkbox"]');
+    boxes.forEach(function (box, i) {
+      if (saved[i]) box.checked = true;
+      box.addEventListener("change", function () {
+        saved[i] = box.checked;
+        try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+        update();
+      });
+    });
+    function update() {
+      document.querySelectorAll(".group:not(.done)").forEach(function (g) {
+        var all = g.querySelectorAll('input[type="checkbox"]');
+        var done = g.querySelectorAll('input[type="checkbox"]:checked');
+        var c = g.querySelector("[data-count]");
+        if (c) c.textContent = done.length + " / " + all.length;
+      });
+    }
+    update();
+  })();
+</script>
