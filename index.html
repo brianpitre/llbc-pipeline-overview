@@ -118,12 +118,12 @@
                     border-radius: 8px; }
   ul.checks label:hover { background: var(--surface); }
   ul.checks input { width: 17px; height: 17px; margin-top: 3px; accent-color: var(--accent); }
-  .group.done ul.checks input { accent-color: var(--done); }
+  ul.checks input:checked { accent-color: var(--gate); }
+  ul.checks label:has(input:checked) { background: var(--gate-soft); }
   .group.done ul.checks label { cursor: default; }
   .t { font-size: 15px; }
   .t small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 1px; }
-  input:checked + .t { color: var(--muted); }
-  .group.done input:checked + .t { color: inherit; }
+  input:checked + .t { color: inherit; }
 
   .foot { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line);
           color: var(--muted); font-size: 13.5px; }
@@ -265,15 +265,15 @@
   </div>
 
   <div class="group" id="team">
-    <div class="g-head"><span class="g-title">To do &#8212; Brian &amp; team</span><span class="g-count" data-count></span></div>
+    <div class="g-head"><span class="g-title">To do &#8212; Team</span><span class="g-count" data-count></span></div>
     <ul class="checks">
-      <li><label><input type="checkbox"><span class="t">Provision the iMac<small>User <code>aitranslator</code> &#183; never-sleep &#183; auto-login &#183; TeamViewer with named accounts + 2FA (see SETUP.md)</small></span></label></li>
-      <li><label><input type="checkbox"><span class="t">Create the three Dropbox folders and point the config at them<small>QC packages &#183; Delivered &#183; Decisions Inbox</small></span></label></li>
-      <li><label><input type="checkbox"><span class="t">OpenRouter API key into <code>.env</code><small>Secure handoff &#8212; never chat or email</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Provision the iMac<small>User <code>aitranslator</code> &#183; never-sleep &#183; auto-login &#183; TeamViewer with named accounts + 2FA (see SETUP.md)</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Create the three Dropbox folders and point the config at them<small>QC packages &#183; Delivered &#183; Decisions Inbox</small></span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">OpenRouter API key into <code>.env</code><small>Secure handoff &#8212; never chat or email</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Fill the real manifest<small>One row per video: id, course, module, title, speaker, source path</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Speaker roster: ElevenLabs clone + recorded consent per teacher</span></label></li>
       <li><label><input type="checkbox"><span class="t">Point the system at the source masters<small>Where they live, what format</small></span></label></li>
-      <li><label><input type="checkbox"><span class="t">Confirm ElevenLabs account capacity for batch volume</span></label></li>
+      <li><label><input type="checkbox" checked disabled><span class="t">Confirm ElevenLabs account capacity for batch volume</span></label></li>
       <li><label><input type="checkbox"><span class="t">Brief the native reviewers on the Dropbox review flow</span></label></li>
     </ul>
   </div>
@@ -284,7 +284,7 @@
       <li><label><input type="checkbox"><span class="t">Health check passes live<small><code>doctor.py --live</code>: keys, model slugs, voices all verified</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Voice certification per speaker &#215; language<small>One-minute proof before any full lesson is processed</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Pilot 1&#8211;2 full lessons in both languages, whole chain</span></label></li>
-      <li><label><input type="checkbox"><span class="t">Validate the 24-minute single-pass lip-sync<small>The last real technical unknown; fallback documented if it caps</small></span></label></li>
+      <li><label><input type="checkbox"><span class="t">Validate the 24-minute single-pass lip-sync</span></label></li>
       <li><label><input type="checkbox"><span class="t">Native reviewers confirm the language decisions<small>Formality (t&#250;/usted &#183; tu/voi) &#183; course-title language &#183; provisional glossary terms</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Time a full lesson end to end<small>Machine hours + review minutes, so we can schedule the full catalog</small></span></label></li>
       <li><label><input type="checkbox"><span class="t">Leadership green-light to scale beyond the pilot</span></label></li>
